@@ -1,0 +1,11 @@
+tokens.json
+credentials.json
+.env
+checked.txt
+free.txt
+__pycache__/
+browser_profile/
+results.jsonl
+.venv/
+.pytest_cache/
+*.zip

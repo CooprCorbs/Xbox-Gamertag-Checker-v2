@@ -1,0 +1,13 @@
+{
+  "kind": "SIMULATED: mocked network latency, scaled wall-clock scheduling",
+  "tags": 100,
+  "latency_seconds_before_scaling": 0.5,
+  "time_scale": 0.002,
+  "old_delay_seconds_before_scaling": 10,
+  "new_interval_seconds_before_scaling": 1,
+  "new_concurrency": 2,
+  "old_measured_seconds": 2.1308,
+  "new_measured_seconds": 0.2351,
+  "measured_ratio": 9.06,
+  "limitations": "No Xbox or Discord calls. Scaling and event-loop overhead affect timings. Not a live throughput prediction."
+}
