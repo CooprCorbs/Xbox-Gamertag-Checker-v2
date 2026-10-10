@@ -2,11 +2,12 @@
 
 - Python 3.12.14 on Linux; xbox-webapi 2.1.0, discord.py 2.7.1,
   httpx 0.28.1, pytest 9.1.1 and pytest-asyncio 1.4.0.
-- `python -m pytest -q`: **51 passed**. The only warning is discord.py's
+- `python -m pytest -q`: **52 passed**. The only warning is discord.py's
   Python 3.12 `audioop` deprecation notice.
 - The mocked 1000-tag Discord run completed all unique checks, saved all 1000
   classifications and history entries, saved every candidate hit, exercised
-  live progress with throttled edits, and attached the full result list.
+  live progress with throttled edits and a coloured rolling list of the latest
+  14 checked tags, and attached the full result list.
 - Coverage includes the 1000 count boundary/default 30 and sync hook; exhausted
   candidate spaces; shared concurrency/throttling/deduplication; seconds and
   HTTP-date Retry-After; retries/timeouts; prompt cancellation during requests

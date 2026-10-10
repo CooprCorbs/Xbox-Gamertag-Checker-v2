@@ -81,8 +81,8 @@ async def test_mock_1000_hunt_progress_and_complete_saving(tmp_path, monkeypatch
     engine = CheckingEngine(lookup, Settings(concurrency=2, interval=0), ResultStore(tmp_path))
     monkeypatch.setattr(bot, 'runtime', SimpleNamespace(get=AsyncMock(return_value=engine)))
     original_reporter = bot.progress_reporter
-    async def reporter(live, progress, done):
-        await original_reporter(live, progress, done, interval=0.01)
+    async def reporter(live, progress, done, recent=()):
+        await original_reporter(live, progress, done, interval=0.01, recent=recent)
     monkeypatch.setattr(bot, 'progress_reporter', reporter)
     i, live = interaction()
     messages = []
@@ -105,6 +105,10 @@ async def test_mock_1000_hunt_progress_and_complete_saving(tmp_path, monkeypatch
     assert 1 < len(messages) < 100
     assert any('checked' in m and 'candidate hits' in m and 'elapsed' in m for m in messages[:-1])
     assert 'finished: 1000/1000 checked' in messages[-1]
+    assert '```ansi' in messages[-1]
+    assert sum('(xbox)' in line for line in messages[-1].splitlines()) == 14
+    assert any('(xbox)' in message for message in messages[:-1])
+    assert all(len(message) < 2000 for message in messages)
     files = [call.kwargs['file'] for call in i.channel.send.await_args_list if 'file' in call.kwargs]
     i.followup.send.assert_not_awaited()  # No expiring interaction webhooks in long-hunt reporting.
     assert len(files) == 1
@@ -164,3 +168,14 @@ async def test_check_uses_same_engine(monkeypatch, tmp_path):
 def test_removed_cli_flags(flag):
     with pytest.raises(SystemExit):
         hunter.make_parser().parse_args(['hunt', flag])
+
+
+def test_live_tags_distinguish_all_classifications():
+    from engine import FAILED, UNKNOWN, Progress, Result
+    p = Progress(4, 4)
+    text = bot.render(p, [Result('abcd', TAKEN), Result('efgh', POTENTIAL),
+                          Result('ijkl', UNKNOWN), Result('mnop', FAILED)])
+    assert '\x1b[31m[-] Taken: abcd (xbox)' in text
+    assert '\x1b[32m[+] potentially available — manual verification required: efgh (xbox)' in text
+    assert '[!] unknown: ijkl' in text and '[!] failed: mnop' in text
+    assert text.startswith('```ansi') and len(text) < 2000

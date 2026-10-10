@@ -57,7 +57,9 @@ Or double-click `run_all.bat`, which starts **only the bot**, not a second hunte
 
 `/hunt` accepts 1–1000 candidates, with a default of 30. The bot synchronizes the
 updated global command schema once during startup; Discord may take time to
-refresh cached commands. It shows completed checked/requested counts, candidate
+refresh cached commands. It shows a coloured rolling list of the latest 14 checked tags, including taken,
+potentially available, unknown and failed outcomes, alongside completed
+checked/requested counts, candidate
 hits, attempted counts, failures, unknowns and elapsed time. Edits happen at most
 once every three seconds during checking, plus the final edit. Slow/failed edits
 do not block Xbox checks. Progress and final reports use ordinary bot channel

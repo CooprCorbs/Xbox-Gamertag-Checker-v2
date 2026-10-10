@@ -2,12 +2,13 @@
 import asyncio
 import io
 import os
+from collections import deque
 from dataclasses import dataclass, field
 
 import discord
 from discord import app_commands
 
-from engine import Progress, candidates, interruptible
+from engine import POTENTIAL, TAKEN, Progress, candidates, interruptible
 from hunter import Notifications, SharedRuntime, load_env
 
 
@@ -38,19 +39,31 @@ bot = HunterBot(intents=discord.Intents.default())
 tree = app_commands.CommandTree(bot)
 
 
-def render(progress):
-    return (progress.summary() + '\n'
-            'Candidate hits are potentially available — manual verification required.')
+def render(progress, recent=()):
+    summary = progress.summary()
+    note = 'Candidate hits are potentially available — manual verification required.'
+    if not recent:
+        return summary + '\n' + note
+    lines = []
+    for result in recent:
+        color = '32' if result.status == POTENTIAL else ('31' if result.status == TAKEN else '33')
+        marker = '[+]' if result.status == POTENTIAL else ('[-]' if result.status == TAKEN else '[!]')
+        label = 'Taken' if result.status == TAKEN else result.status
+        lines.append(f'\x1b[{color}m{marker} {label}: {result.tag} (xbox)\x1b[0m')
+    # A rolling window keeps updates readable and within Discord's message limit.
+    while lines and len('\n'.join(lines)) + len(summary) + len(note) + 40 > 1900:
+        lines.pop(0)
+    return '```ansi\n' + '\n'.join(lines) + f'\n\x1b[36m[i] {summary}\x1b[0m\n```\n' + note
 
 
-async def progress_reporter(live, progress, done, interval=3.0):
+async def progress_reporter(live, progress, done, interval=3.0, recent=()):
     """Independent throttled edits; a slow Discord request never holds up checking."""
     while not done.is_set():
         try:
             await asyncio.wait_for(done.wait(), interval)
         except asyncio.TimeoutError:
             try:
-                await asyncio.wait_for(live.edit(content=render(progress)), 10)
+                await asyncio.wait_for(live.edit(content=render(progress, recent)), 10)
             except Exception:
                 pass
 
@@ -88,6 +101,7 @@ async def hunt_cmd(interaction: discord.Interaction,
     stop = state.stop
     progress = Progress(count, 0)
     results = {}
+    recent = deque(maxlen=14)
     live = None
     reporter = None
     done = asyncio.Event()
@@ -95,13 +109,16 @@ async def hunt_cmd(interaction: discord.Interaction,
         await interruptible(interaction.response.send_message(
             'Starting hunt; progress and results will be posted in this channel.'), stop, 10)
         live = await interruptible(interaction.channel.send(render(progress)), stop, 10)
-        reporter = asyncio.create_task(progress_reporter(live, progress, done))
+        reporter = asyncio.create_task(progress_reporter(live, progress, done, recent=recent))
         engine = await interruptible(runtime.get(stop), stop, 30)
         tags = candidates(length, count, letters_only, engine.store.seen)
         progress.scheduled = len(tags)
         await notifications.start()
+        def record_result(result):
+            recent.append(result)
+            notifications.enqueue(result)
         results, progress = await engine.run(tags, stop, progress=progress,
-                                              on_result=notifications.enqueue)
+                                              on_result=record_result)
     except asyncio.CancelledError:
         progress.outcome = 'cancelled'
         stop.set()
@@ -117,7 +134,7 @@ async def hunt_cmd(interaction: discord.Interaction,
         state.running = False
         if live:
             try:
-                await asyncio.wait_for(live.edit(content=render(progress)), 10)
+                await asyncio.wait_for(live.edit(content=render(progress, recent)), 10)
             except Exception:
                 pass
         try:
